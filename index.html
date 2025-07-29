@@ -189,40 +189,40 @@
                 chartContainer.style.display = 'none';
 
                 try {
-                    // Duas chamadas de API: uma para análise diária, outra para o gráfico intraday
+                    // 1. Busca dados para a análise (diário)
                     const analysisApiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
-                    const chartApiUrl = `https://brapi.dev/api/quote/${ticker}?range=5d&interval=1m&token=${apiToken}`;
-
-                    const [analysisResponse, chartResponse] = await Promise.all([
-                        fetch(analysisApiUrl),
-                        fetch(chartApiUrl)
-                    ]);
+                    const analysisResponse = await fetch(analysisApiUrl);
+                    if (!analysisResponse.ok) throw new Error('Falha ao buscar dados de análise diária.');
                     
-                    if (!analysisResponse.ok || !chartResponse.ok) {
-                         throw new Error('Falha ao buscar dados da API. Verifique o código da ação e o token.');
-                    }
-
                     const analysisData = await analysisResponse.json();
-                    const chartData = await chartResponse.json();
-
                     const stockData = analysisData.results[0];
                     const dailyHistoricalData = stockData.historicalDataPrice;
-                    const intradayHistoricalData = chartData.results[0].historicalDataPrice;
-
-
                     if (!dailyHistoricalData || dailyHistoricalData.length < 22) {
                          throw new Error('Dados históricos diários insuficientes para análise.');
                     }
-                     if (!intradayHistoricalData) {
-                         throw new Error('Dados intraday insuficientes para o gráfico.');
+
+                    // 2. Tenta buscar dados para o gráfico (intraday 1m)
+                    let chartHistoricalData;
+                    let chartTimeUnit = 'hour'; // Padrão para intraday
+                    try {
+                        const chartApiUrl = `https://brapi.dev/api/quote/${ticker}?range=5d&interval=1m&token=${apiToken}`;
+                        const chartResponse = await fetch(chartApiUrl);
+                        if (!chartResponse.ok) throw new Error('Dados intraday não disponíveis.');
+                        const chartData = await chartResponse.json();
+                        chartHistoricalData = chartData.results[0].historicalDataPrice;
+                        if (!chartHistoricalData) throw new Error('Dados intraday não disponíveis.');
+                    } catch (intradayError) {
+                        // 3. Fallback: se intraday falhar, busca dados diários para o gráfico
+                        console.warn('Fallback: Dados intraday (1m) não encontrados. Usando dados diários (1d) para o gráfico.');
+                        chartHistoricalData = dailyHistoricalData;
+                        chartTimeUnit = 'day'; // Muda a unidade de tempo para diário
                     }
                     
                     const closingPrices = dailyHistoricalData.map(item => item.close);
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    createOrUpdateChart(intradayHistoricalData);
-                    
+                    createOrUpdateChart(chartHistoricalData, chartTimeUnit);
                     displayResult(stockData, rsi, sma21);
 
                 } catch (error) {
@@ -233,26 +233,26 @@
                 }
             }
 
-            function createOrUpdateChart(chartRawData) {
+            function createOrUpdateChart(chartRawData, timeUnit) {
                 chartContainer.style.display = 'block';
-
-                const twentyFourHoursAgo = new Date().getTime() - (24 * 60 * 60 * 1000);
-
-                const dataPoints = chartRawData
-                    .filter(data => (data.date * 1000) >= twentyFourHoursAgo)
-                    .map(data => ({
-                        x: new Date(data.date * 1000).valueOf(),
-                        o: data.open,
-                        h: data.high,
-                        l: data.low,
-                        c: data.close
-                    }));
                 
-                if (dataPoints.length === 0) {
-                    chartContainer.innerHTML = `<div class="text-center p-4 bg-gray-800 text-white rounded-lg">Sem dados de negociação nas últimas 24 horas.</div>`;
-                    return;
+                let dataPoints;
+                if (timeUnit === 'hour') {
+                    // Filtra para últimas 24h se os dados forem intraday
+                    const twentyFourHoursAgo = new Date().getTime() - (24 * 60 * 60 * 1000);
+                    dataPoints = chartRawData
+                        .filter(data => (data.date * 1000) >= twentyFourHoursAgo)
+                        .map(data => ({ x: new Date(data.date * 1000).valueOf(), o: data.open, h: data.high, l: data.low, c: data.close }));
+                } else {
+                    // Usa os últimos 30 pontos se os dados forem diários
+                    dataPoints = chartRawData.slice(-30).map(data => ({ x: new Date(data.date * 1000).valueOf(), o: data.open, h: data.high, l: data.low, c: data.close }));
                 }
 
+                if (dataPoints.length === 0) {
+                    chartContainer.innerHTML = `<div class="text-center p-4 bg-gray-800 text-white rounded-lg">Sem dados de negociação para exibir no gráfico.</div>`;
+                    if(stockChart) { stockChart.destroy(); stockChart = null; }
+                    return;
+                }
 
                 const data = {
                     datasets: [{
@@ -266,14 +266,12 @@
                     data: data,
                     options: {
                         plugins: {
-                            legend: {
-                                display: false
-                            },
+                            legend: { display: false },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
                                         const raw = context.raw;
-                                        return `Abertura: ${raw.o.toFixed(2)} Máxima: ${raw.h.toFixed(2)} Mínima: ${raw.l.toFixed(2)} Fechamento: ${raw.c.toFixed(2)}`;
+                                        return `A: ${raw.o.toFixed(2)} M: ${raw.h.toFixed(2)} m: ${raw.l.toFixed(2)} F: ${raw.c.toFixed(2)}`;
                                     }
                                 }
                             }
@@ -281,57 +279,41 @@
                         scales: {
                             x: {
                                 type: 'time',
-                                time: {
-                                    unit: 'hour' // Ajustado para mostrar horas
-                                },
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.1)'
-                                },
-                                ticks: {
-                                    color: 'white'
-                                }
+                                time: { unit: timeUnit },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                ticks: { color: 'white' }
                             },
                             y: {
                                 beginAtZero: false,
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.1)'
-                                },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
                                 ticks: {
                                     color: 'white',
-                                    callback: function(value, index, values) {
-                                        return 'R$ ' + value.toFixed(2);
-                                    }
+                                    callback: function(value) { return 'R$ ' + value.toFixed(2); }
                                 }
                             }
                         }
                     }
                 };
                 
-                // Plugin para desenhar o fundo do gráfico
                 const customCanvasBackgroundColor = {
                     id: 'customCanvasBackgroundColor',
-                    beforeDraw: (chart, args, options) => {
+                    beforeDraw: (chart) => {
                         const {ctx} = chart;
                         ctx.save();
                         ctx.globalCompositeOperation = 'destination-over';
-                        ctx.fillStyle = 'black'; // Fundo preto
+                        ctx.fillStyle = 'black';
                         ctx.fillRect(0, 0, chart.width, chart.height);
                         ctx.restore();
                     }
                 };
                 
                 if (stockChart) {
+                    stockChart.config.options.scales.x.time.unit = timeUnit;
                     stockChart.data.datasets[0].data = dataPoints;
                     stockChart.update();
                 } else {
-                    // Adiciona o plugin de cor de fundo ao criar o gráfico
-                    Chart.defaults.plugins.customCanvasBackgroundColor = { color: 'white' }; // Cor padrão
                     Chart.defaults.datasets.candlestick.color = { up: '#16a34a', down: '#ef4444', unchanged: '#9ca3af' };
-
-                    stockChart = new Chart(chartCanvas, {
-                        ...config,
-                        plugins: [customCanvasBackgroundColor]
-                    });
+                    stockChart = new Chart(chartCanvas, { ...config, plugins: [customCanvasBackgroundColor] });
                 }
             }
             
