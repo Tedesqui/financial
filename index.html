@@ -11,6 +11,7 @@
     <!-- Inclusão das bibliotecas de gráfico -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/build/chartjs-chart-financial.min.js"></script>
 
     <style>
         body {
@@ -95,7 +96,7 @@
 
             // --- CONFIGURAÇÃO PRINCIPAL ---
             // IMPORTANTE: Cole seu token da API Brapi aqui, no lugar de "SEU_TOKEN_AQUI"
-            const apiToken = "nMWaQN6yQE7QgxpfAmEfzN";
+            const apiToken = "SEU_TOKEN_AQUI";
 
             // --- VARIÁVEIS DE CONTROLE ---
             let monitoringIntervalId = null;
@@ -208,7 +209,10 @@
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    createOrUpdateChart(historicalData);
+                    // Filtra os dados para mostrar apenas os últimos 30 dias no gráfico
+                    const last30DaysData = historicalData.slice(-30);
+                    createOrUpdateChart(last30DaysData);
+                    
                     displayResult(stockData, rsi, sma21);
 
                 } catch (error) {
@@ -219,25 +223,26 @@
                 }
             }
 
-            function createOrUpdateChart(historicalData) {
+            function createOrUpdateChart(chartData) {
                 chartContainer.style.display = 'block';
-                const labels = historicalData.map(data => new Date(data.date * 1000));
-                const dataPoints = historicalData.map(data => data.close);
+                
+                const dataPoints = chartData.map(data => ({
+                    x: new Date(data.date * 1000).valueOf(),
+                    o: data.open,
+                    h: data.high,
+                    l: data.low,
+                    c: data.close
+                }));
 
                 const data = {
-                    labels: labels,
                     datasets: [{
-                        label: `Preço de Fechamento`,
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
+                        label: `Preço (OHLC)`,
                         data: dataPoints,
-                        tension: 0.1,
-                        fill: true
                     }]
                 };
 
                 const config = {
-                    type: 'line',
+                    type: 'candlestick',
                     data: data,
                     options: {
                         scales: {
@@ -262,13 +267,20 @@
                         plugins: {
                             legend: {
                                 display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const raw = context.raw;
+                                        return `Abertura: ${raw.o.toFixed(2)} Máxima: ${raw.h.toFixed(2)} Mínima: ${raw.l.toFixed(2)} Fechamento: ${raw.c.toFixed(2)}`;
+                                    }
+                                }
                             }
                         }
                     }
                 };
                 
                 if (stockChart) {
-                    stockChart.data.labels = labels;
                     stockChart.data.datasets[0].data = dataPoints;
                     stockChart.update();
                 } else {
