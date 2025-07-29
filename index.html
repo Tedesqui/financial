@@ -8,11 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Inclusão das bibliotecas de gráfico -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <!-- URL Corrigida para a biblioteca de gráficos financeiros -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
 
     <style>
         body {
@@ -65,11 +60,6 @@
         <!-- Loader -->
         <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
         
-        <!-- Chart Section -->
-        <div class="mt-6 hidden" id="chartContainer">
-            <canvas id="stockChart"></canvas>
-        </div>
-
         <!-- Result Section -->
         <div id="result" class="mt-6 hidden">
             <!-- O conteúdo será inserido via JavaScript -->
@@ -92,8 +82,6 @@
             const resultDiv = document.getElementById('result');
             const loader = document.getElementById('loader');
             const statusDiv = document.getElementById('monitoringStatus');
-            const chartContainer = document.getElementById('chartContainer');
-            const chartCanvas = document.getElementById('stockChart');
 
             // --- CONFIGURAÇÃO PRINCIPAL ---
             // IMPORTANTE: Cole seu token da API Brapi aqui, no lugar de "SEU_TOKEN_AQUI"
@@ -102,13 +90,18 @@
             // --- VARIÁVEIS DE CONTROLE ---
             let monitoringIntervalId = null;
             let countdownIntervalId = null;
-            let stockChart = null;
 
             // --- EVENT LISTENERS ---
             startButton.addEventListener('click', startMonitoring);
             stopButton.addEventListener('click', stopMonitoring);
 
             function playAlertSound() {
+                // Vibra por 5 segundos em dispositivos compatíveis (a maioria dos celulares Android)
+                if (navigator.vibrate) {
+                    navigator.vibrate(5000);
+                }
+
+                // Alerta sonoro como fallback ou complemento
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 if (!audioContext) return;
                 const oscillator = audioContext.createOscillator();
@@ -135,7 +128,6 @@
 
                 if (monitoringIntervalId) clearInterval(monitoringIntervalId);
                 if (countdownIntervalId) clearInterval(countdownIntervalId);
-                if (stockChart) stockChart.destroy();
 
                 startButton.disabled = true;
                 stopButton.disabled = false;
@@ -151,16 +143,11 @@
             function stopMonitoring() {
                 if (monitoringIntervalId) clearInterval(monitoringIntervalId);
                 if (countdownIntervalId) clearInterval(countdownIntervalId);
-                if (stockChart) {
-                    stockChart.destroy();
-                    stockChart = null;
-                }
                 
                 monitoringIntervalId = null;
                 countdownIntervalId = null;
                 
                 statusDiv.innerHTML = 'Monitoramento parado.';
-                chartContainer.style.display = 'none';
                 startButton.disabled = false;
                 stopButton.disabled = true;
             }
@@ -186,43 +173,29 @@
 
                 loader.style.display = 'block';
                 resultDiv.style.display = 'none';
-                chartContainer.style.display = 'none';
 
                 try {
-                    // 1. Busca dados para a análise (diário)
-                    const analysisApiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
-                    const analysisResponse = await fetch(analysisApiUrl);
-                    if (!analysisResponse.ok) throw new Error('Falha ao buscar dados de análise diária.');
+                    const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
+                    const response = await fetch(apiUrl);
                     
-                    const analysisData = await analysisResponse.json();
-                    const stockData = analysisData.results[0];
-                    const dailyHistoricalData = stockData.historicalDataPrice;
-                    if (!dailyHistoricalData || dailyHistoricalData.length < 22) {
-                         throw new Error('Dados históricos diários insuficientes para análise.');
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => null);
+                        const errorMessage = errorData?.message || `Erro ${response.status}. Verifique o código da ação e seu token.`;
+                        throw new Error(errorMessage);
                     }
 
-                    // 2. Tenta buscar dados para o gráfico (intraday 1m)
-                    let chartHistoricalData;
-                    let chartTimeUnit = 'hour'; // Padrão para intraday
-                    try {
-                        const chartApiUrl = `https://brapi.dev/api/quote/${ticker}?range=5d&interval=1m&token=${apiToken}`;
-                        const chartResponse = await fetch(chartApiUrl);
-                        if (!chartResponse.ok) throw new Error('Dados intraday não disponíveis.');
-                        const chartData = await chartResponse.json();
-                        chartHistoricalData = chartData.results[0].historicalDataPrice;
-                        if (!chartHistoricalData) throw new Error('Dados intraday não disponíveis.');
-                    } catch (intradayError) {
-                        // 3. Fallback: se intraday falhar, busca dados diários para o gráfico
-                        console.warn('Fallback: Dados intraday (1m) não encontrados. Usando dados diários (1d) para o gráfico.');
-                        chartHistoricalData = dailyHistoricalData;
-                        chartTimeUnit = 'day'; // Muda a unidade de tempo para diário
+                    const data = await response.json();
+                    const stockData = data.results[0];
+                    const historicalData = stockData.historicalDataPrice;
+
+                    if (!historicalData || historicalData.length < 22) {
+                         throw new Error('Dados históricos insuficientes para uma análise completa.');
                     }
                     
-                    const closingPrices = dailyHistoricalData.map(item => item.close);
+                    const closingPrices = historicalData.map(item => item.close);
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    createOrUpdateChart(chartHistoricalData, chartTimeUnit);
                     displayResult(stockData, rsi, sma21);
 
                 } catch (error) {
@@ -230,90 +203,6 @@
                     if (monitoringIntervalId) stopMonitoring();
                 } finally {
                     loader.style.display = 'none';
-                }
-            }
-
-            function createOrUpdateChart(chartRawData, timeUnit) {
-                chartContainer.style.display = 'block';
-                
-                let dataPoints;
-                if (timeUnit === 'hour') {
-                    // Filtra para últimas 24h se os dados forem intraday
-                    const twentyFourHoursAgo = new Date().getTime() - (24 * 60 * 60 * 1000);
-                    dataPoints = chartRawData
-                        .filter(data => (data.date * 1000) >= twentyFourHoursAgo)
-                        .map(data => ({ x: new Date(data.date * 1000).valueOf(), o: data.open, h: data.high, l: data.low, c: data.close }));
-                } else {
-                    // Usa os últimos 30 pontos se os dados forem diários
-                    dataPoints = chartRawData.slice(-30).map(data => ({ x: new Date(data.date * 1000).valueOf(), o: data.open, h: data.high, l: data.low, c: data.close }));
-                }
-
-                if (dataPoints.length === 0) {
-                    chartContainer.innerHTML = `<div class="text-center p-4 bg-gray-800 text-white rounded-lg">Sem dados de negociação para exibir no gráfico.</div>`;
-                    if(stockChart) { stockChart.destroy(); stockChart = null; }
-                    return;
-                }
-
-                const data = {
-                    datasets: [{
-                        label: `Preço (OHLC)`,
-                        data: dataPoints,
-                    }]
-                };
-
-                const config = {
-                    type: 'candlestick',
-                    data: data,
-                    options: {
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const raw = context.raw;
-                                        return `A: ${raw.o.toFixed(2)} M: ${raw.h.toFixed(2)} m: ${raw.l.toFixed(2)} F: ${raw.c.toFixed(2)}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: { unit: timeUnit },
-                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                ticks: { color: 'white' }
-                            },
-                            y: {
-                                beginAtZero: false,
-                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                ticks: {
-                                    color: 'white',
-                                    callback: function(value) { return 'R$ ' + value.toFixed(2); }
-                                }
-                            }
-                        }
-                    }
-                };
-                
-                const customCanvasBackgroundColor = {
-                    id: 'customCanvasBackgroundColor',
-                    beforeDraw: (chart) => {
-                        const {ctx} = chart;
-                        ctx.save();
-                        ctx.globalCompositeOperation = 'destination-over';
-                        ctx.fillStyle = 'black';
-                        ctx.fillRect(0, 0, chart.width, chart.height);
-                        ctx.restore();
-                    }
-                };
-                
-                if (stockChart) {
-                    stockChart.config.options.scales.x.time.unit = timeUnit;
-                    stockChart.data.datasets[0].data = dataPoints;
-                    stockChart.update();
-                } else {
-                    Chart.defaults.datasets.candlestick.color = { up: '#16a34a', down: '#ef4444', unchanged: '#9ca3af' };
-                    stockChart = new Chart(chartCanvas, { ...config, plugins: [customCanvasBackgroundColor] });
                 }
             }
             
