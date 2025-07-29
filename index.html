@@ -189,30 +189,39 @@
                 chartContainer.style.display = 'none';
 
                 try {
-                    const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
-                    const response = await fetch(apiUrl);
+                    // Duas chamadas de API: uma para análise diária, outra para o gráfico intraday
+                    const analysisApiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
+                    const chartApiUrl = `https://brapi.dev/api/quote/${ticker}?range=5d&interval=1m&token=${apiToken}`;
+
+                    const [analysisResponse, chartResponse] = await Promise.all([
+                        fetch(analysisApiUrl),
+                        fetch(chartApiUrl)
+                    ]);
                     
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => null);
-                        const errorMessage = errorData?.message || `Erro ${response.status}. Verifique o código da ação e seu token.`;
-                        throw new Error(errorMessage);
+                    if (!analysisResponse.ok || !chartResponse.ok) {
+                         throw new Error('Falha ao buscar dados da API. Verifique o código da ação e o token.');
                     }
 
-                    const data = await response.json();
-                    const stockData = data.results[0];
-                    const historicalData = stockData.historicalDataPrice;
+                    const analysisData = await analysisResponse.json();
+                    const chartData = await chartResponse.json();
 
-                    if (!historicalData || historicalData.length < 22) {
-                         throw new Error('Dados históricos insuficientes para uma análise completa.');
+                    const stockData = analysisData.results[0];
+                    const dailyHistoricalData = stockData.historicalDataPrice;
+                    const intradayHistoricalData = chartData.results[0].historicalDataPrice;
+
+
+                    if (!dailyHistoricalData || dailyHistoricalData.length < 22) {
+                         throw new Error('Dados históricos diários insuficientes para análise.');
+                    }
+                     if (!intradayHistoricalData) {
+                         throw new Error('Dados intraday insuficientes para o gráfico.');
                     }
                     
-                    const closingPrices = historicalData.map(item => item.close);
+                    const closingPrices = dailyHistoricalData.map(item => item.close);
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    // Filtra os dados para mostrar apenas os últimos 7 dias no gráfico
-                    const last7DaysData = historicalData.slice(-7);
-                    createOrUpdateChart(last7DaysData);
+                    createOrUpdateChart(intradayHistoricalData);
                     
                     displayResult(stockData, rsi, sma21);
 
@@ -224,26 +233,31 @@
                 }
             }
 
-            function createOrUpdateChart(chartData) {
+            function createOrUpdateChart(chartRawData) {
                 chartContainer.style.display = 'block';
+
+                const twentyFourHoursAgo = new Date().getTime() - (24 * 60 * 60 * 1000);
+
+                const dataPoints = chartRawData
+                    .filter(data => (data.date * 1000) >= twentyFourHoursAgo)
+                    .map(data => ({
+                        x: new Date(data.date * 1000).valueOf(),
+                        o: data.open,
+                        h: data.high,
+                        l: data.low,
+                        c: data.close
+                    }));
                 
-                const dataPoints = chartData.map(data => ({
-                    x: new Date(data.date * 1000).valueOf(),
-                    o: data.open,
-                    h: data.high,
-                    l: data.low,
-                    c: data.close
-                }));
+                if (dataPoints.length === 0) {
+                    chartContainer.innerHTML = `<div class="text-center p-4 bg-gray-800 text-white rounded-lg">Sem dados de negociação nas últimas 24 horas.</div>`;
+                    return;
+                }
+
 
                 const data = {
                     datasets: [{
                         label: `Preço (OHLC)`,
                         data: dataPoints,
-                        color: {
-                            up: '#16a34a', // Verde para alta
-                            down: '#ef4444', // Vermelho para baixa
-                            unchanged: '#9ca3af', // Cinza
-                        },
                     }]
                 };
 
@@ -252,10 +266,6 @@
                     data: data,
                     options: {
                         plugins: {
-                            // Plugin customizado para o fundo preto
-                            customCanvasBackgroundColor: {
-                                color: 'black',
-                            },
                             legend: {
                                 display: false
                             },
@@ -272,7 +282,7 @@
                             x: {
                                 type: 'time',
                                 time: {
-                                    unit: 'day'
+                                    unit: 'hour' // Ajustado para mostrar horas
                                 },
                                 grid: {
                                     color: 'rgba(255, 255, 255, 0.1)'
@@ -296,7 +306,7 @@
                         }
                     }
                 };
-
+                
                 // Plugin para desenhar o fundo do gráfico
                 const customCanvasBackgroundColor = {
                     id: 'customCanvasBackgroundColor',
@@ -304,7 +314,7 @@
                         const {ctx} = chart;
                         ctx.save();
                         ctx.globalCompositeOperation = 'destination-over';
-                        ctx.fillStyle = options.color || 'white';
+                        ctx.fillStyle = 'black'; // Fundo preto
                         ctx.fillRect(0, 0, chart.width, chart.height);
                         ctx.restore();
                     }
@@ -314,6 +324,10 @@
                     stockChart.data.datasets[0].data = dataPoints;
                     stockChart.update();
                 } else {
+                    // Adiciona o plugin de cor de fundo ao criar o gráfico
+                    Chart.defaults.plugins.customCanvasBackgroundColor = { color: 'white' }; // Cor padrão
+                    Chart.defaults.datasets.candlestick.color = { up: '#16a34a', down: '#ef4444', unchanged: '#9ca3af' };
+
                     stockChart = new Chart(chartCanvas, {
                         ...config,
                         plugins: [customCanvasBackgroundColor]
