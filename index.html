@@ -74,6 +74,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // --- ELEMENTOS DA PÁGINA ---
             const tickerInput = document.getElementById('tickerInput');
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
@@ -81,9 +82,15 @@
             const loader = document.getElementById('loader');
             const statusDiv = document.getElementById('monitoringStatus');
 
+            // --- CONFIGURAÇÃO PRINCIPAL ---
+            // IMPORTANTE: Cole seu token da API Brapi aqui, no lugar de "SEU_TOKEN_AQUI"
+            const apiToken = "nMWaQN6yQE7QgxpfAmEfzN";
+
+            // --- VARIÁVEIS DE CONTROLE ---
             let monitoringIntervalId = null;
             let countdownIntervalId = null;
 
+            // --- EVENT LISTENERS ---
             startButton.addEventListener('click', startMonitoring);
             stopButton.addEventListener('click', stopMonitoring);
 
@@ -107,24 +114,18 @@
 
             function startMonitoring() {
                 const ticker = tickerInput.value.trim().toUpperCase();
-                 // IMPORTANTE: Cole seu token da API Brapi aqui
-                const apiToken = "nMWaQN6yQE7QgxpfAmEfzN";
 
                 if (!ticker) {
                     alert('Por favor, digite o código de uma ação para monitorar.');
                     return;
                 }
-                if (apiToken === "nMWaQN6yQE7QgxpfAmEfzN") {
+                if (apiToken === "nMWaQN6yQE7QgxpfAmEfzN" || apiToken === "") {
                     alert('Por favor, insira seu token da API Brapi diretamente no código HTML.');
                     return;
                 }
 
-                if (monitoringIntervalId) {
-                    clearInterval(monitoringIntervalId);
-                }
-                if (countdownIntervalId) {
-                    clearInterval(countdownIntervalId);
-                }
+                if (monitoringIntervalId) clearInterval(monitoringIntervalId);
+                if (countdownIntervalId) clearInterval(countdownIntervalId);
 
                 startButton.disabled = true;
                 stopButton.disabled = false;
@@ -138,14 +139,12 @@
             }
 
             function stopMonitoring() {
-                if (monitoringIntervalId) {
-                    clearInterval(monitoringIntervalId);
-                    monitoringIntervalId = null;
-                }
-                 if (countdownIntervalId) {
-                    clearInterval(countdownIntervalId);
-                    countdownIntervalId = null;
-                }
+                if (monitoringIntervalId) clearInterval(monitoringIntervalId);
+                if (countdownIntervalId) clearInterval(countdownIntervalId);
+                
+                monitoringIntervalId = null;
+                countdownIntervalId = null;
+                
                 statusDiv.innerHTML = 'Monitoramento parado.';
                 startButton.disabled = false;
                 stopButton.disabled = true;
@@ -167,14 +166,10 @@
                 countdownIntervalId = setInterval(updateCountdown, 1000);
             }
 
-
             async function analyzeTicker() {
-                // IMPORTANTE: Cole seu token da API Brapi aqui
-                const apiToken = "nMWaQN6yQE7QgxpfAmEfzN";
                 const ticker = tickerInput.value.trim().toUpperCase();
 
-                if (!ticker || apiToken === "nMWaQN6yQE7QgxpfAmEfzN") {
-                    // Para o monitoramento se os dados forem inválidos
+                if (!ticker) {
                     if(monitoringIntervalId) stopMonitoring();
                     return;
                 }
