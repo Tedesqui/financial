@@ -40,14 +40,21 @@
         <div class="mt-8 space-y-4">
             <div>
                 <label for="tickerInput" class="text-sm font-medium text-gray-700">Código da Ação (B3)</label>
-                <div class="flex items-center gap-3 mt-1">
-                    <input type="text" id="tickerInput" placeholder="Ex: PETR4, VALE3, MGLU3" class="flex-grow block w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out">
-                    <button id="checkButton" class="px-5 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                        Analisar
-                    </button>
-                </div>
+                <input type="text" id="tickerInput" placeholder="Ex: PETR4, VALE3, MGLU3" class="mt-1 flex-grow block w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out">
+            </div>
+             <!-- Botões de Ação -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                 <button id="startButton" class="w-full px-5 py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
+                    ▶ Iniciar Monitoramento
+                </button>
+                <button id="stopButton" class="w-full px-5 py-3 font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out" disabled>
+                    ■ Parar Monitoramento
+                </button>
             </div>
         </div>
+        
+        <!-- Status Section -->
+        <div id="monitoringStatus" class="mt-4 text-center text-sm text-gray-600 bg-gray-100 p-3 rounded-lg hidden"></div>
 
         <!-- Loader -->
         <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
@@ -68,27 +75,43 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const tickerInput = document.getElementById('tickerInput');
-            const checkButton = document.getElementById('checkButton');
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
             const resultDiv = document.getElementById('result');
             const loader = document.getElementById('loader');
+            const statusDiv = document.getElementById('monitoringStatus');
 
-            // Permite que o usuário aperte Enter para pesquisar
-            tickerInput.addEventListener('keyup', (event) => {
-                if (event.key === 'Enter') {
-                    checkButton.click();
-                }
-            });
-            
-            checkButton.addEventListener('click', analyzeTicker);
+            let monitoringIntervalId = null;
+            let countdownIntervalId = null;
 
-            async function analyzeTicker() {
-                // IMPORTANTE: Cole seu token da API Brapi aqui
-                const apiToken = "nMWaQN6yQE7QgxpfAmEfzN";
+            startButton.addEventListener('click', startMonitoring);
+            stopButton.addEventListener('click', stopMonitoring);
 
+            function playAlertSound() {
+                // Usa a Web Audio API para criar um som sem precisar de um arquivo
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (!audioContext) return; // Não suportado
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.type = 'sine'; // Onda senoidal para um tom limpo
+                oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // Frequência (tom)
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Volume
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5); // Duração do som
+            }
+
+            function startMonitoring() {
                 const ticker = tickerInput.value.trim().toUpperCase();
+                 // IMPORTANTE: Cole seu token da API Brapi aqui
+                const apiToken = "SEU_TOKEN_AQUI";
 
                 if (!ticker) {
-                    alert('Por favor, digite o código de uma ação.');
+                    alert('Por favor, digite o código de uma ação para monitorar.');
                     return;
                 }
                 if (apiToken === "SEU_TOKEN_AQUI") {
@@ -96,18 +119,74 @@
                     return;
                 }
 
-                // Prepara a UI para a análise
-                resultDiv.style.display = 'none';
-                resultDiv.innerHTML = '';
+                if (monitoringIntervalId) {
+                    clearInterval(monitoringIntervalId);
+                }
+                if (countdownIntervalId) {
+                    clearInterval(countdownIntervalId);
+                }
+
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                
+                analyzeTicker(); // Executa a primeira análise imediatamente
+
+                const checkIntervalSeconds = 60; // Verificar a cada 60 segundos
+                monitoringIntervalId = setInterval(analyzeTicker, checkIntervalSeconds * 1000);
+                
+                updateStatus(checkIntervalSeconds);
+            }
+
+            function stopMonitoring() {
+                if (monitoringIntervalId) {
+                    clearInterval(monitoringIntervalId);
+                    monitoringIntervalId = null;
+                }
+                 if (countdownIntervalId) {
+                    clearInterval(countdownIntervalId);
+                    countdownIntervalId = null;
+                }
+                statusDiv.innerHTML = 'Monitoramento parado.';
+                startButton.disabled = false;
+                stopButton.disabled = true;
+            }
+
+            function updateStatus(seconds) {
+                statusDiv.style.display = 'block';
+                let remaining = seconds;
+
+                const updateCountdown = () => {
+                    statusDiv.innerHTML = `Monitoramento ativo para <strong>${tickerInput.value.toUpperCase()}</strong>. Próxima verificação em <strong>${remaining}</strong> segundos...`;
+                    remaining--;
+                    if (remaining < 0) {
+                        remaining = seconds -1;
+                    }
+                };
+                
+                updateCountdown();
+                countdownIntervalId = setInterval(updateCountdown, 1000);
+            }
+
+
+            async function analyzeTicker() {
+                // IMPORTANTE: Cole seu token da API Brapi aqui
+                const apiToken = "SEU_TOKEN_AQUI";
+                const ticker = tickerInput.value.trim().toUpperCase();
+
+                if (!ticker || apiToken === "nMWaQN6yQE7QgxpfAmEfzN") {
+                    // Para o monitoramento se os dados forem inválidos
+                    if(monitoringIntervalId) stopMonitoring();
+                    return;
+                }
+
                 loader.style.display = 'block';
+                resultDiv.style.display = 'none';
 
                 try {
-                    // 1. Busca os dados da API, agora incluindo o token e o range correto
                     const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
                     const response = await fetch(apiUrl);
                     
                     if (!response.ok) {
-                        // Se a resposta não for OK, tenta ler a mensagem de erro da API
                         const errorData = await response.json().catch(() => null);
                         const errorMessage = errorData?.message || `Erro ${response.status}. Verifique o código da ação e seu token.`;
                         throw new Error(errorMessage);
@@ -117,49 +196,32 @@
                     const stockData = data.results[0];
                     const historicalData = stockData.historicalDataPrice;
 
-                    if (!historicalData || historicalData.length < 22) { // Precisa de pelo menos 22 dias para MMS21
+                    if (!historicalData || historicalData.length < 22) {
                          throw new Error('Dados históricos insuficientes para uma análise completa.');
                     }
                     
-                    // 2. Calcula os indicadores
                     const closingPrices = historicalData.map(item => item.close);
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    // 3. Exibe o resultado
                     displayResult(stockData, rsi, sma21);
 
                 } catch (error) {
                     displayError(error.message);
+                    if(monitoringIntervalId) stopMonitoring(); // Para o monitoramento em caso de erro
                 } finally {
                     loader.style.display = 'none';
                 }
             }
             
-            /**
-             * Calcula o Índice de Força Relativa (RSI).
-             * @param {number[]} prices - Array de preços de fechamento.
-             * @param {number} period - O período para o cálculo (padrão 14).
-             * @returns {number} O valor do RSI.
-             */
             function calculateRSI(prices, period = 14) {
-                let gains = 0;
-                let losses = 0;
-
-                // Calcula a primeira média de ganhos e perdas
+                let gains = 0, losses = 0;
                 for (let i = 1; i <= period; i++) {
                     const difference = prices[i] - prices[i - 1];
-                    if (difference >= 0) {
-                        gains += difference;
-                    } else {
-                        losses -= difference;
-                    }
+                    if (difference >= 0) gains += difference;
+                    else losses -= difference;
                 }
-
-                let avgGain = gains / period;
-                let avgLoss = losses / period;
-
-                // Suaviza as médias para o restante dos dados
+                let avgGain = gains / period, avgLoss = losses / period;
                 for (let i = period + 1; i < prices.length; i++) {
                     const difference = prices[i] - prices[i - 1];
                     if (difference >= 0) {
@@ -170,19 +232,11 @@
                         avgLoss = (avgLoss * (period - 1) - difference) / period;
                     }
                 }
-                
                 if (avgLoss === 0) return 100;
-
                 const rs = avgGain / avgLoss;
                 return 100 - (100 / (1 + rs));
             }
 
-            /**
-             * Calcula a Média Móvel Simples (SMA).
-             * @param {number[]} prices - Array de preços de fechamento.
-             * @param {number} period - O período para o cálculo.
-             * @returns {number} O valor da SMA.
-             */
             function calculateSMA(prices, period) {
                 const recentPrices = prices.slice(prices.length - period);
                 const sum = recentPrices.reduce((a, b) => a + b, 0);
@@ -191,27 +245,19 @@
 
             function displayError(message) {
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = `
-                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
-                        <p class="font-bold">Erro na Análise</p>
-                        <p>${message}</p>
-                    </div>
-                `;
+                resultDiv.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert"><p class="font-bold">Erro na Análise</p><p>${message}</p></div>`;
             }
 
             function displayResult(stock, rsi, sma21) {
                 resultDiv.style.display = 'block';
                 const currentPrice = stock.regularMarketPrice;
-                
-                let signalClass = '';
-                let signalTitle = '';
-                let signalDescription = '';
+                let signalClass, signalTitle, signalDescription;
 
-                // Lógica de decisão combinando os dois indicadores
                 if (rsi < 35 && currentPrice > sma21) {
                     signalClass = 'bg-green-100 border-green-500 text-green-800';
                     signalTitle = 'Sinal de Compra Forte';
                     signalDescription = 'A ação está em nível de sobrevenda (IFR baixo) e acima de sua média de curto prazo (MMS 21), indicando uma possível reversão para alta. Pode ser um bom momento para compra.';
+                    playAlertSound(); // TOCA O ALERTA SONORO
                 } else if (rsi > 70) {
                     signalClass = 'bg-red-100 border-red-500 text-red-800';
                     signalTitle = 'Sinal de Cautela (Sobrecompra)';
@@ -231,24 +277,15 @@
                                 <p class="text-2xl font-bold">R$ ${currentPrice.toFixed(2)}</p>
                             </div>
                         </div>
-                        
                         <div class="space-y-3 text-sm">
                             <p><strong>Diagnóstico:</strong> <span class="font-semibold">${signalTitle}</span></p>
                             <p>${signalDescription}</p>
                         </div>
-
                         <div class="mt-4 pt-4 border-t border-gray-300/50 grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <p class="font-semibold">Índice de Força Relativa (IFR 14)</p>
-                                <p class="text-lg font-bold">${rsi.toFixed(2)}</p>
-                            </div>
-                            <div>
-                                <p class="font-semibold">Média Móvel (MMS 21)</p>
-                                <p class="text-lg font-bold">R$ ${sma21.toFixed(2)}</p>
-                            </div>
+                            <div><p class="font-semibold">Índice de Força Relativa (IFR 14)</p><p class="text-lg font-bold">${rsi.toFixed(2)}</p></div>
+                            <div><p class="font-semibold">Média Móvel (MMS 21)</p><p class="text-lg font-bold">R$ ${sma21.toFixed(2)}</p></div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }
         });
     </script>
