@@ -210,9 +210,9 @@
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
-                    // Filtra os dados para mostrar apenas os últimos 30 dias no gráfico
-                    const last30DaysData = historicalData.slice(-30);
-                    createOrUpdateChart(last30DaysData);
+                    // Filtra os dados para mostrar apenas os últimos 7 dias no gráfico
+                    const last7DaysData = historicalData.slice(-7);
+                    createOrUpdateChart(last7DaysData);
                     
                     displayResult(stockData, rsi, sma21);
 
@@ -239,6 +239,11 @@
                     datasets: [{
                         label: `Preço (OHLC)`,
                         data: dataPoints,
+                        color: {
+                            up: '#16a34a', // Verde para alta
+                            down: '#ef4444', // Vermelho para baixa
+                            unchanged: '#9ca3af', // Cinza
+                        },
                     }]
                 };
 
@@ -246,26 +251,11 @@
                     type: 'candlestick',
                     data: data,
                     options: {
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    unit: 'day'
-                                },
-                                grid: {
-                                    display: false
-                                }
-                            },
-                            y: {
-                                beginAtZero: false,
-                                ticks: {
-                                    callback: function(value, index, values) {
-                                        return 'R$ ' + value.toFixed(2);
-                                    }
-                                }
-                            }
-                        },
                         plugins: {
+                            // Plugin customizado para o fundo preto
+                            customCanvasBackgroundColor: {
+                                color: 'black',
+                            },
                             legend: {
                                 display: false
                             },
@@ -277,7 +267,46 @@
                                     }
                                 }
                             }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day'
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: 'white'
+                                }
+                            },
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: 'white',
+                                    callback: function(value, index, values) {
+                                        return 'R$ ' + value.toFixed(2);
+                                    }
+                                }
+                            }
                         }
+                    }
+                };
+
+                // Plugin para desenhar o fundo do gráfico
+                const customCanvasBackgroundColor = {
+                    id: 'customCanvasBackgroundColor',
+                    beforeDraw: (chart, args, options) => {
+                        const {ctx} = chart;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'destination-over';
+                        ctx.fillStyle = options.color || 'white';
+                        ctx.fillRect(0, 0, chart.width, chart.height);
+                        ctx.restore();
                     }
                 };
                 
@@ -285,7 +314,10 @@
                     stockChart.data.datasets[0].data = dataPoints;
                     stockChart.update();
                 } else {
-                    stockChart = new Chart(chartCanvas, config);
+                    stockChart = new Chart(chartCanvas, {
+                        ...config,
+                        plugins: [customCanvasBackgroundColor]
+                    });
                 }
             }
             
