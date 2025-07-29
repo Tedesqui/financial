@@ -129,7 +129,7 @@
                 
                 analyzeTicker();
 
-                const checkIntervalSeconds = 30; // <-- VALOR ALTERADO
+                const checkIntervalSeconds = 30;
                 monitoringIntervalId = setInterval(analyzeTicker, checkIntervalSeconds * 1000);
                 
                 updateStatus(checkIntervalSeconds);
@@ -167,7 +167,8 @@
                 }
 
                 loader.style.display = 'block';
-                resultDiv.style.display = 'none';
+                // A linha abaixo foi removida para evitar que a página suba durante a atualização.
+                // resultDiv.style.display = 'none';
 
                 try {
                     const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
