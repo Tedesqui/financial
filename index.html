@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisador de Mercado - Melhor Momento para Comprar (Projeto de Jean Tedesqui)</title>
+    <title>Analisador de Mercado - Melhor Momento para Comprar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,47 +31,49 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8">
-        <div class="text-center">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Analisador de Ações</h1>
-            <p class="text-gray-500 mt-2">Descubra o melhor momento para comprar com base em análise técnica.</p>
-        </div>
-
-        <!-- Input Section -->
-        <div class="mt-8 space-y-4">
-            <div>
-                <label for="tickerInput" class="text-sm font-medium text-gray-700">Código da Ação (B3)</label>
-                <input type="text" id="tickerInput" placeholder="Ex: PETR4, VALE3, MGLU3" class="mt-1 flex-grow block w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out">
+    <main style="margin-top: -100px;">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <div class="text-center">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Analisador de Ações</h1>
+                <p class="text-gray-500 mt-2">Descubra o melhor momento para comprar com base em análise técnica.</p>
             </div>
-             <!-- Botões de Ação -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <button id="startButton" class="w-full px-5 py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
-                    ▶ Iniciar Monitoramento
-                </button>
-                <button id="stopButton" class="w-full px-5 py-3 font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out" disabled>
-                    ■ Parar Monitoramento
-                </button>
+
+            <!-- Input Section -->
+            <div class="mt-8 space-y-4">
+                <div>
+                    <label for="tickerInput" class="text-sm font-medium text-gray-700">Código da Ação (B3)</label>
+                    <input type="text" id="tickerInput" placeholder="Ex: PETR4, VALE3, MGLU3" class="mt-1 flex-grow block w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out">
+                </div>
+                 <!-- Botões de Ação -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                     <button id="startButton" class="w-full px-5 py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
+                        ▶ Iniciar Monitoramento
+                    </button>
+                    <button id="stopButton" class="w-full px-5 py-3 font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out" disabled>
+                        ■ Parar Monitoramento
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status Section -->
+            <div id="monitoringStatus" class="mt-4 text-center text-sm text-gray-600 bg-gray-100 p-3 rounded-lg hidden"></div>
+
+            <!-- Loader -->
+            <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
+            
+            <!-- Result Section -->
+            <div id="result" class="mt-6 hidden">
+                <!-- O conteúdo será inserido via JavaScript -->
             </div>
         </div>
-        
-        <!-- Status Section -->
-        <div id="monitoringStatus" class="mt-4 text-center text-sm text-gray-600 bg-gray-100 p-3 rounded-lg hidden"></div>
 
-        <!-- Loader -->
-        <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
-        
-        <!-- Result Section -->
-        <div id="result" class="mt-6 hidden">
-            <!-- O conteúdo será inserido via JavaScript -->
+        <!-- Disclaimer -->
+        <div class="w-full max-w-lg text-center mt-6">
+            <p class="text-xs text-gray-500">
+                <strong>⚠️ AVISO LEGAL:</strong> Esta ferramenta é para fins educacionais e de estudo. Os resultados são gerados por algoritmos baseados em indicadores técnicos e não constituem uma recomendação de investimento. Investir em ações envolve riscos. Faça sua própria análise antes de tomar qualquer decisão financeira.
+            </p>
         </div>
-    </div>
-
-    <!-- Disclaimer -->
-    <div class="w-full max-w-lg text-center mt-6">
-        <p class="text-xs text-gray-500">
-            <strong>⚠️ AVISO LEGAL:</strong> Esta ferramenta é para fins educacionais e de estudo. Os resultados são gerados por algoritmos baseados em indicadores técnicos e não constituem uma recomendação de investimento. Investir em ações envolve riscos. Faça sua própria análise antes de tomar qualquer decisão financeira.
-        </p>
-    </div>
+    </main>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
