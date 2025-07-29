@@ -1,217 +1,257 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Identificador de Carros com IA</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Mercado - Melhor Momento para Comprar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: black;
-            color: white;
-            overflow: hidden;
+        body {
+            font-family: 'Inter', sans-serif;
         }
-
-        video, canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            z-index: 0;
+        /* Estilo para o spinner/loader */
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
         }
-
-        canvas {
-            display: none;
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
         }
-
-        #ui-container {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            z-index: 2;
-        }
-
-        #controls {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));
-        }
-
-        button {
-            padding: 12px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-            button:hover:not(:disabled) {
-                background-color: #0056b3;
-                transform: translateY(-2px);
-            }
-
-            button:disabled {
-                background: #555;
-                cursor: not-allowed;
-                opacity: 0.7;
-            }
-
-        #output-panel {
-            background: rgba(0,0,0,0.9);
-            padding: 15px;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-sizing: border-box;
-            border-top: 1px solid #444;
-        }
-
-        pre#car-info {
-            background-color: #2a2a2a;
-            padding: 1rem;
-            border-radius: 6px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            line-height: 1.6;
-            font-size: 0.9em;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body>
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    <div id="ui-container">
-        <div id="controls">
-            <button id="zoomBtn">🔍 Zoom: 1x</button>
-            <button id="captureBtn">📷 Identificar Carro</button>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8">
+        <div class="text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Analisador de Ações</h1>
+            <p class="text-gray-500 mt-2">Descubra o melhor momento para comprar com base em análise técnica.</p>
         </div>
-        <div id="output-panel">
-            <div id="status-text">🚗 Aponte a câmera para um carro e capture a imagem.</div>
+
+        <!-- Input Section -->
+        <div class="mt-8 space-y-4">
+            <div>
+                <label for="tickerInput" class="text-sm font-medium text-gray-700">Código da Ação (B3)</label>
+                <div class="flex items-center gap-3 mt-1">
+                    <input type="text" id="tickerInput" placeholder="Ex: PETR4, VALE3, MGLU3" class="flex-grow block w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out">
+                    <button id="checkButton" class="px-5 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                        Analisar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loader -->
+        <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
+
+        <!-- Result Section -->
+        <div id="result" class="mt-6 hidden">
+            <!-- O conteúdo será inserido via JavaScript -->
         </div>
     </div>
+
+    <!-- Disclaimer -->
+    <div class="w-full max-w-lg text-center mt-6">
+        <p class="text-xs text-gray-500">
+            <strong>⚠️ AVISO LEGAL:</strong> Esta ferramenta é para fins educacionais e de estudo. Os resultados são gerados por algoritmos baseados em indicadores técnicos e não constituem uma recomendação de investimento. Investir em ações envolve riscos. Faça sua própria análise antes de tomar qualquer decisão financeira.
+        </p>
+    </div>
+
     <script>
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-        const outputPanel = document.getElementById("output-panel");
-        const controlsDiv = document.getElementById("controls");
-        const zoomBtn = document.getElementById("zoomBtn");
-        const captureBtn = document.getElementById("captureBtn");
-        let mediaTrack, currentZoom = 1;
-        const zoomLevels = [1, 1.5, 2, 3];
+        document.addEventListener('DOMContentLoaded', () => {
+            const tickerInput = document.getElementById('tickerInput');
+            const checkButton = document.getElementById('checkButton');
+            const resultDiv = document.getElementById('result');
+            const loader = document.getElementById('loader');
 
-        async function startCamera() {
-            try {
-                const constraints = { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
-                mediaTrack = stream.getVideoTracks()[0];
-                const capabilities = mediaTrack.getCapabilities();
-                if (!capabilities.zoom || capabilities.zoom.max <= 1) {
-                    zoomBtn.style.display = 'none';
+            // Permite que o usuário aperte Enter para pesquisar
+            tickerInput.addEventListener('keyup', (event) => {
+                if (event.key === 'Enter') {
+                    checkButton.click();
                 }
-            } catch (err) {
-                console.error("Erro ao iniciar a câmera:", err);
-                outputPanel.innerHTML = `<div id="status-text">❌ Erro ao acessar a câmera. Verifique as permissões.</div>`;
-            }
-        }
+            });
+            
+            checkButton.addEventListener('click', analyzeTicker);
 
-        function toggleZoom() {
-            if (!mediaTrack) return;
-            const capabilities = mediaTrack.getCapabilities();
-            if (!capabilities.zoom) return;
-            const currentIndex = zoomLevels.indexOf(currentZoom);
-            currentZoom = zoomLevels[(currentIndex + 1) % zoomLevels.length];
-            if (currentZoom > capabilities.zoom.max) currentZoom = zoomLevels[0];
-            mediaTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            zoomBtn.innerText = `🔍 Zoom: ${currentZoom}x`;
-        }
+            async function analyzeTicker() {
+                // IMPORTANTE: Cole seu token da API Brapi aqui
+                const apiToken = "SEU_TOKEN_AQUI";
 
-        function resetUI() {
-            canvas.style.display = 'none';
-            video.style.display = 'block';
-            outputPanel.innerHTML = `<div id="status-text">🚗 Aponte a câmera para um carro e capture a imagem.</div>`;
-            controlsDiv.style.display = 'flex';
-            captureBtn.disabled = false;
-        }
+                const ticker = tickerInput.value.trim().toUpperCase();
 
-        function addRetryButton(action) {
-            const existing = outputPanel.querySelector('.retry-button-bottom');
-            if (existing) return;
-            const btn = document.createElement('button');
-            btn.innerText = 'Identificar Outro Carro';
-            btn.className = 'retry-button-bottom';
-            btn.style.marginTop = '15px';
-            btn.addEventListener('click', action);
-            outputPanel.appendChild(btn);
-        }
-
-        // Função principal que captura e envia para a IA
-        async function captureAndIdentify() {
-            captureBtn.disabled = true;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            video.style.display = 'none';
-            canvas.style.display = 'block';
-            controlsDiv.style.display = 'none';
-            outputPanel.innerHTML = `<div id="status-text">🧠 Analisando a imagem do carro...</div>`;
-
-            try {
-                const imageDataUrl = canvas.toDataURL('image/jpeg');
-
-                // O prompt que instrui a IA sobre o que fazer com a imagem.
-                const prompt = `
-                        Identifique o modelo, a marca e o ano aproximado do carro nesta imagem.
-                        Forneça também algumas características principais sobre ele, como tipo de motor, potência e um fato interessante ou uma curiosidade.
-                        Se a imagem não contiver um carro, apenas informe isso de forma amigável.
-                        Responda em português do Brasil, formatado de maneira clara.
-                    `;
-
-                // A chamada para a API do seu backend
-                const response = await fetch("/api/identify-car", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        image: imageDataUrl,
-                        prompt: prompt
-                    })
-                });
-
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || `Erro na API: ${response.status}`);
+                if (!ticker) {
+                    alert('Por favor, digite o código de uma ação.');
+                    return;
+                }
+                if (apiToken === "SEU_TOKEN_AQUI") {
+                    alert('Por favor, insira seu token da API Brapi diretamente no código HTML.');
+                    return;
                 }
 
-                const data = await response.json();
-                outputPanel.innerHTML = `<h2>✅ Análise do Veículo</h2><pre id="car-info">${data.resultado}</pre>`;
+                // Prepara a UI para a análise
+                resultDiv.style.display = 'none';
+                resultDiv.innerHTML = '';
+                loader.style.display = 'block';
 
-            } catch (err) {
-                console.error("Erro na requisição:", err);
-                outputPanel.innerHTML = `<div id="status-text">❌ Erro ao analisar a imagem: ${err.message}</div>`;
-            } finally {
-                addRetryButton(resetUI);
+                try {
+                    // 1. Busca os dados da API, agora incluindo o token e o range correto
+                    const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
+                    const response = await fetch(apiUrl);
+                    
+                    if (!response.ok) {
+                        // Se a resposta não for OK, tenta ler a mensagem de erro da API
+                        const errorData = await response.json().catch(() => null);
+                        const errorMessage = errorData?.message || `Erro ${response.status}. Verifique o código da ação e seu token.`;
+                        throw new Error(errorMessage);
+                    }
+
+                    const data = await response.json();
+                    const stockData = data.results[0];
+                    const historicalData = stockData.historicalDataPrice;
+
+                    if (!historicalData || historicalData.length < 22) { // Precisa de pelo menos 22 dias para MMS21
+                         throw new Error('Dados históricos insuficientes para uma análise completa.');
+                    }
+                    
+                    // 2. Calcula os indicadores
+                    const closingPrices = historicalData.map(item => item.close);
+                    const rsi = calculateRSI(closingPrices);
+                    const sma21 = calculateSMA(closingPrices, 21);
+                    
+                    // 3. Exibe o resultado
+                    displayResult(stockData, rsi, sma21);
+
+                } catch (error) {
+                    displayError(error.message);
+                } finally {
+                    loader.style.display = 'none';
+                }
             }
-        }
+            
+            /**
+             * Calcula o Índice de Força Relativa (RSI).
+             * @param {number[]} prices - Array de preços de fechamento.
+             * @param {number} period - O período para o cálculo (padrão 14).
+             * @returns {number} O valor do RSI.
+             */
+            function calculateRSI(prices, period = 14) {
+                let gains = 0;
+                let losses = 0;
 
-        zoomBtn.addEventListener('click', toggleZoom);
-        captureBtn.addEventListener('click', captureAndIdentify);
-        startCamera();
+                // Calcula a primeira média de ganhos e perdas
+                for (let i = 1; i <= period; i++) {
+                    const difference = prices[i] - prices[i - 1];
+                    if (difference >= 0) {
+                        gains += difference;
+                    } else {
+                        losses -= difference;
+                    }
+                }
+
+                let avgGain = gains / period;
+                let avgLoss = losses / period;
+
+                // Suaviza as médias para o restante dos dados
+                for (let i = period + 1; i < prices.length; i++) {
+                    const difference = prices[i] - prices[i - 1];
+                    if (difference >= 0) {
+                        avgGain = (avgGain * (period - 1) + difference) / period;
+                        avgLoss = (avgLoss * (period - 1)) / period;
+                    } else {
+                        avgGain = (avgGain * (period - 1)) / period;
+                        avgLoss = (avgLoss * (period - 1) - difference) / period;
+                    }
+                }
+                
+                if (avgLoss === 0) return 100;
+
+                const rs = avgGain / avgLoss;
+                return 100 - (100 / (1 + rs));
+            }
+
+            /**
+             * Calcula a Média Móvel Simples (SMA).
+             * @param {number[]} prices - Array de preços de fechamento.
+             * @param {number} period - O período para o cálculo.
+             * @returns {number} O valor da SMA.
+             */
+            function calculateSMA(prices, period) {
+                const recentPrices = prices.slice(prices.length - period);
+                const sum = recentPrices.reduce((a, b) => a + b, 0);
+                return sum / period;
+            }
+
+            function displayError(message) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
+                        <p class="font-bold">Erro na Análise</p>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }
+
+            function displayResult(stock, rsi, sma21) {
+                resultDiv.style.display = 'block';
+                const currentPrice = stock.regularMarketPrice;
+                
+                let signalClass = '';
+                let signalTitle = '';
+                let signalDescription = '';
+
+                // Lógica de decisão combinando os dois indicadores
+                if (rsi < 35 && currentPrice > sma21) {
+                    signalClass = 'bg-green-100 border-green-500 text-green-800';
+                    signalTitle = 'Sinal de Compra Forte';
+                    signalDescription = 'A ação está em nível de sobrevenda (IFR baixo) e acima de sua média de curto prazo (MMS 21), indicando uma possível reversão para alta. Pode ser um bom momento para compra.';
+                } else if (rsi > 70) {
+                    signalClass = 'bg-red-100 border-red-500 text-red-800';
+                    signalTitle = 'Sinal de Cautela (Sobrecompra)';
+                    signalDescription = 'O IFR elevado sugere que a ação subiu muito rapidamente e pode estar supervalorizada no curto prazo. O risco de uma correção (queda) é maior.';
+                } else {
+                    signalClass = 'bg-yellow-100 border-yellow-500 text-yellow-800';
+                    signalTitle = 'Sinal Neutro';
+                    signalDescription = 'A ação não apresenta sinais claros de sobrecompra ou sobrevenda no momento. Recomenda-se aguardar por um sinal mais definido.';
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="border-l-4 p-4 rounded-lg ${signalClass}">
+                        <div class="flex items-center mb-4">
+                            <img src="${stock.logourl}" alt="Logo da empresa" class="w-12 h-12 mr-4 rounded-full" onerror="this.style.display='none'">
+                            <div>
+                                <h2 class="text-xl font-bold">${stock.symbol} - ${stock.longName}</h2>
+                                <p class="text-2xl font-bold">R$ ${currentPrice.toFixed(2)}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3 text-sm">
+                            <p><strong>Diagnóstico:</strong> <span class="font-semibold">${signalTitle}</span></p>
+                            <p>${signalDescription}</p>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-gray-300/50 grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p class="font-semibold">Índice de Força Relativa (IFR 14)</p>
+                                <p class="text-lg font-bold">${rsi.toFixed(2)}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold">Média Móvel (MMS 21)</p>
+                                <p class="text-lg font-bold">R$ ${sma21.toFixed(2)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
     </script>
+
 </body>
 </html>
