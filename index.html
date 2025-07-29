@@ -8,6 +8,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inclusão das bibliotecas de gráfico -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -58,6 +62,11 @@
 
         <!-- Loader -->
         <div id="loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto my-6 hidden"></div>
+        
+        <!-- Chart Section -->
+        <div class="mt-6 hidden" id="chartContainer">
+            <canvas id="stockChart"></canvas>
+        </div>
 
         <!-- Result Section -->
         <div id="result" class="mt-6 hidden">
@@ -81,6 +90,8 @@
             const resultDiv = document.getElementById('result');
             const loader = document.getElementById('loader');
             const statusDiv = document.getElementById('monitoringStatus');
+            const chartContainer = document.getElementById('chartContainer');
+            const chartCanvas = document.getElementById('stockChart');
 
             // --- CONFIGURAÇÃO PRINCIPAL ---
             // IMPORTANTE: Cole seu token da API Brapi aqui, no lugar de "SEU_TOKEN_AQUI"
@@ -89,32 +100,28 @@
             // --- VARIÁVEIS DE CONTROLE ---
             let monitoringIntervalId = null;
             let countdownIntervalId = null;
+            let stockChart = null;
 
             // --- EVENT LISTENERS ---
             startButton.addEventListener('click', startMonitoring);
             stopButton.addEventListener('click', stopMonitoring);
 
             function playAlertSound() {
-                // Usa a Web Audio API para criar um som sem precisar de um arquivo
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                if (!audioContext) return; // Não suportado
+                if (!audioContext) return;
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
-
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
-
-                oscillator.type = 'sine'; // Onda senoidal para um tom limpo
-                oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // Frequência (tom)
-                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Volume
-
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
                 oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5); // Duração do som
+                oscillator.stop(audioContext.currentTime + 0.5);
             }
 
             function startMonitoring() {
                 const ticker = tickerInput.value.trim().toUpperCase();
-
                 if (!ticker) {
                     alert('Por favor, digite o código de uma ação para monitorar.');
                     return;
@@ -126,13 +133,14 @@
 
                 if (monitoringIntervalId) clearInterval(monitoringIntervalId);
                 if (countdownIntervalId) clearInterval(countdownIntervalId);
+                if (stockChart) stockChart.destroy();
 
                 startButton.disabled = true;
                 stopButton.disabled = false;
                 
-                analyzeTicker(); // Executa a primeira análise imediatamente
+                analyzeTicker();
 
-                const checkIntervalSeconds = 60; // Verificar a cada 60 segundos
+                const checkIntervalSeconds = 60;
                 monitoringIntervalId = setInterval(analyzeTicker, checkIntervalSeconds * 1000);
                 
                 updateStatus(checkIntervalSeconds);
@@ -141,11 +149,16 @@
             function stopMonitoring() {
                 if (monitoringIntervalId) clearInterval(monitoringIntervalId);
                 if (countdownIntervalId) clearInterval(countdownIntervalId);
+                if (stockChart) {
+                    stockChart.destroy();
+                    stockChart = null;
+                }
                 
                 monitoringIntervalId = null;
                 countdownIntervalId = null;
                 
                 statusDiv.innerHTML = 'Monitoramento parado.';
+                chartContainer.style.display = 'none';
                 startButton.disabled = false;
                 stopButton.disabled = true;
             }
@@ -153,29 +166,25 @@
             function updateStatus(seconds) {
                 statusDiv.style.display = 'block';
                 let remaining = seconds;
-
                 const updateCountdown = () => {
                     statusDiv.innerHTML = `Monitoramento ativo para <strong>${tickerInput.value.toUpperCase()}</strong>. Próxima verificação em <strong>${remaining}</strong> segundos...`;
                     remaining--;
-                    if (remaining < 0) {
-                        remaining = seconds -1;
-                    }
+                    if (remaining < 0) remaining = seconds - 1;
                 };
-                
                 updateCountdown();
                 countdownIntervalId = setInterval(updateCountdown, 1000);
             }
 
             async function analyzeTicker() {
                 const ticker = tickerInput.value.trim().toUpperCase();
-
                 if (!ticker) {
-                    if(monitoringIntervalId) stopMonitoring();
+                    if (monitoringIntervalId) stopMonitoring();
                     return;
                 }
 
                 loader.style.display = 'block';
                 resultDiv.style.display = 'none';
+                chartContainer.style.display = 'none';
 
                 try {
                     const apiUrl = `https://brapi.dev/api/quote/${ticker}?range=3mo&interval=1d&fundamental=true&token=${apiToken}`;
@@ -199,13 +208,71 @@
                     const rsi = calculateRSI(closingPrices);
                     const sma21 = calculateSMA(closingPrices, 21);
                     
+                    createOrUpdateChart(historicalData);
                     displayResult(stockData, rsi, sma21);
 
                 } catch (error) {
                     displayError(error.message);
-                    if(monitoringIntervalId) stopMonitoring(); // Para o monitoramento em caso de erro
+                    if (monitoringIntervalId) stopMonitoring();
                 } finally {
                     loader.style.display = 'none';
+                }
+            }
+
+            function createOrUpdateChart(historicalData) {
+                chartContainer.style.display = 'block';
+                const labels = historicalData.map(data => new Date(data.date * 1000));
+                const dataPoints = historicalData.map(data => data.close);
+
+                const data = {
+                    labels: labels,
+                    datasets: [{
+                        label: `Preço de Fechamento`,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        data: dataPoints,
+                        tension: 0.1,
+                        fill: true
+                    }]
+                };
+
+                const config = {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day'
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value, index, values) {
+                                        return 'R$ ' + value.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                };
+                
+                if (stockChart) {
+                    stockChart.data.labels = labels;
+                    stockChart.data.datasets[0].data = dataPoints;
+                    stockChart.update();
+                } else {
+                    stockChart = new Chart(chartCanvas, config);
                 }
             }
             
@@ -252,7 +319,7 @@
                     signalClass = 'bg-green-100 border-green-500 text-green-800';
                     signalTitle = 'Sinal de Compra Forte';
                     signalDescription = 'A ação está em nível de sobrevenda (IFR baixo) e acima de sua média de curto prazo (MMS 21), indicando uma possível reversão para alta. Pode ser um bom momento para compra.';
-                    playAlertSound(); // TOCA O ALERTA SONORO
+                    playAlertSound();
                 } else if (rsi > 70) {
                     signalClass = 'bg-red-100 border-red-500 text-red-800';
                     signalTitle = 'Sinal de Cautela (Sobrecompra)';
